@@ -1,0 +1,787 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>JFT Basic MrDJ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet" />
+    <style>
+      body {
+        font-family: 'Inter', 'Noto Sans JP', sans-serif;
+        background-color: #f0fdf4;
+        /* Mencegah scroll horizontal di mobile */
+        overflow-x: hidden;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .bg-grid {
+        background-size: 20px 20px;
+        background-image: linear-gradient(to right, rgba(16, 185, 129, 0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(16, 185, 129, 0.05) 1px, transparent 1px);
+      }
+
+      .glass-panel {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        box-shadow: 0 4px 20px rgba(31, 38, 135, 0.1);
+      }
+
+      /* Mobile optimizations */
+      @media (max-width: 768px) {
+        .mobile-full {
+          width: 100vw;
+          height: 100vh;
+          max-width: none;
+          border-radius: 0;
+          padding: 1rem;
+        }
+
+        /* Larger touch targets for mobile */
+        .touch-target {
+          min-height: 48px;
+          min-width: 48px;
+        }
+
+        .option-btn {
+          padding: 1rem;
+          font-size: 1rem;
+          min-height: 56px; /* Ideal untuk jari */
+        }
+
+        /* Bottom fixed navigation for mobile */
+        .mobile-nav {
+          position: fixed;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          background: white;
+          border-top: 1px solid #e5e7eb;
+          padding: 0.75rem 1rem;
+          padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+          z-index: 50;
+          box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Content padding untuk menghindari overlap dengan bottom nav */
+        .content-padded {
+          padding-bottom: 100px;
+        }
+
+        /* Compact question number grid */
+        .nav-grid-compact {
+          grid-template-columns: repeat(6, 1fr);
+          gap: 0.25rem;
+        }
+
+        .nav-btn {
+          width: 100%;
+          aspect-ratio: 1;
+          font-size: 0.75rem;
+          min-height: 40px;
+        }
+      }
+
+      /* Safe area untuk iPhone notch */
+      @supports (padding-top: env(safe-area-inset-top)) {
+        .safe-top {
+          padding-top: env(safe-area-inset-top);
+        }
+        .safe-bottom {
+          padding-bottom: env(safe-area-inset-bottom);
+        }
+      }
+
+      /* Prevent text selection untuk UI elements */
+      .no-select {
+        -webkit-user-select: none;
+        user-select: none;
+      }
+
+      /* Smooth scrolling */
+      html {
+        scroll-behavior: smooth;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      /* Custom scrollbar yang lebih tipis di mobile */
+      ::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #a7f3d0;
+        border-radius: 2px;
+      }
+    </style>
+  </head>
+  <body class="min-h-screen flex flex-col text-slate-800 relative safe-top safe-bottom">
+    <div class="fixed inset-0 pointer-events-none z-0 bg-grid"></div>
+    <div class="fixed top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-400 via-teal-500 to-emerald-600 z-50"></div>
+
+    <main id="app" class="flex-grow relative z-10 flex flex-col items-center justify-center p-0 md:p-4"></main>
+
+    <script>
+      const quizData = [
+        {
+          id: 1,
+          section: 'vocab',
+          question: '「新しい <span style="color: #FF0000;">運動靴</span> を買いました。」',
+          options: ['うんどうくつ.', 'うんどうぐつ.', 'えんどぐつ.', 'うんどぐつ.'],
+          correct: 1,
+        },
+        { id: 2, section: 'vocab', question: 'この <span style="color: #FF0000;">映画</span> は とても 面白い です。', options: ['えが', 'えいが', 'えがく', 'えいかく'], correct: 1 },
+        { id: 3, section: 'vocab', question: '明日雨が <span style="color: #FF0000;">降る</span> でしょう。', options: ['ふる', 'のる', 'うる', 'さる'], correct: 0 },
+        { id: 4, section: 'vocab', question: '<span style="color: #FF0000;">雨天</span> の場合、試合は中止です。', options: ['あめてん', 'うてん', 'あまてん', 'うげん'], correct: 1 },
+        { id: 5, section: 'vocab', question: '彼のピアノの<span style="color: #FF0000;">演奏</span> は素晴らしかったです', options: ['えんそう', 'えんそ', 'ねんそう', 'えんしょう'], correct: 0 },
+        { id: 6, section: 'vocab', question: '雨が降ったので、運動会を<span style="color: #FF0000;">延期する</span> そうです。', options: ['えんぎ', 'えんき', 'のき', 'のぎ'], correct: 1 },
+        { id: 7, section: 'vocab', question: 'この ケーキは <span style="color: #FF0000;">甘い</span> です。', options: ['うまい', 'せまい', 'あまい', 'からい'], correct: 2 },
+        { id: 8, section: 'vocab', question: '友達に <span style="color: #FF0000;">でんわ</span> を かける', options: ['電卓', '電車', '電話', '会話'], correct: 2 },
+        { id: 9, section: 'vocab', question: '<span style="color: #FF0000;">きょうしつ</span>  で べんきょうします。', options: ['和室', '会議室', '教室', '台所'], correct: 2 },
+        {
+          id: 10,
+          section: 'vocab',
+          question: '<span style="color: #FF0000;">たちいりきんし</span>  と書いてあります',
+          options: ['立ち入り禁上', '立ち入り禁止', '立ち入り森止', '立ち入り林上'],
+          correct: 1,
+        },
+        { id: 11, section: 'vocab', question: '東京で <span style="color: #FF0000;">じしん</span>  が起こりました', options: ['余震', '地震', '状態', '使用'], correct: 1 },
+        { id: 12, section: 'vocab', question: '<span style="color: #FF0000;">しごと</span>  が おおいです。', options: ['仕事', '仕方', '事仕', '試験'], correct: 0 },
+        { id: 13, section: 'vocab', question: '妹は図書館から本を＿＿＿＿＿。', options: ['買います', '借ります', '食べます', '読みます'], correct: 1 },
+        { id: 14, section: 'vocab', question: '来月、町で国際会議が__________予定です。', options: ['開催する', '催開する', '開ける', '閉める'], correct: 0 },
+        { id: 15, section: 'vocab', question: 'すみません、この＿＿＿＿は いくらですか。', options: ['本', '石', '木', '海'], correct: 0 },
+        { id: 16, section: 'vocab', question: '明日 テストがあるよ。今日＿＿＿＿＿しなければなりません。', options: ['掃除', '食事', '勉強', '旅行'], correct: 2 },
+        {
+          id: 17,
+          section: 'grammar',
+          question: 'Q: きのうの パーティーは どうでしたか。<br>A: とても _______ でした。',
+          options: ['たのしかった', 'たのしい', 'たのしくて', 'たのしくない'],
+          correct: 0,
+        },
+        { id: 18, section: 'grammar', question: 'この ほんは よんだ _______ あります。', options: ['ことが', 'ものが', 'ひとが', 'ところが'], correct: 0 },
+        { id: 19, section: 'grammar', question: '私は日本語が _______ ようになりました。', options: ['話せる', '話す', '話した', '話して'], correct: 0 },
+        { id: 20, section: 'grammar', question: '雨が _______、出かけます。', options: ['降ると', '降るなら', '降っても', '降れば'], correct: 0 },
+        {
+          id: 21,
+          section: 'grammar',
+          question: '迷惑なので電車の中で _______ ください。',
+          options: ['大きい声で話さない', '大きい声で話して', '小さい声で話さない', '乗って'],
+          correct: 0,
+        },
+        { id: 22, section: 'grammar', question: 'うちを買うために、_______', options: ['友達と日本で会います', 'お金をためます', '日本語を勉強します', 'コンビニへ行きます'], correct: 1 },
+        { id: 23, section: 'grammar', question: 'この 料理は母が _______ ものです。', options: ['作った', '作る', '作って', '作り'], correct: 0 },
+        { id: 24, section: 'grammar', question: 'あの窓を _______ もいいですか。', options: ['開けて', '開ける', '開けた', '開いて'], correct: 0 },
+        { id: 25, section: 'grammar', question: '風が_______、勉強を 休みました。', options: ['ひいたので', 'ひくので', 'ひいて', 'ひく'], correct: 0 },
+        { id: 26, section: 'grammar', question: '教室を使ったら、電気を________。', options: ['消してもいいです', '消しておいてください', '消してはいけません', '消してほうがいいです'], correct: 1 },
+        {
+          id: 27,
+          section: 'grammar',
+          question: 'A:「お部屋は235番でございます。」<br>B：「すみません、もう一度お願いします」<br>A：「__________」。<br>B:「はい、わかりました。ありがとうございます」',
+          options: ['はい、そうです', 'お部屋はこちらでございます', 'お部屋は235番でございます。', 'お部屋はわかりますか'],
+          correct: 2,
+        },
+        {
+          id: 28,
+          section: 'grammar',
+          question: 'A:「これは誰ですか、恋人？。」<br>B:「え、ああ、友達です。」<br>A:「_________,日本に住んでいますか。」B：「はい、東京に住んでいます」',
+          options: ['それはいけませんね', 'そうですか', 'ありがとう', 'はい、そうです'],
+          correct: 2,
+        },
+        {
+          id: 29,
+          section: 'grammar',
+          question: 'A:「日本では何をしていますか。」<br>B:「学生です。_____________。」<br>A:「ああ、そうですか。」',
+          options: ['日本語を勉強します', '専門学校に通っています', '働きません', 'わかりますか'],
+          correct: 1,
+        },
+        {
+          id: 30,
+          section: 'grammar',
+          question: 'あのレストランは料理が＿＿＿＿人気があります。',
+          options: ['おいしくなくて', 'おいしい', 'おいしくない', 'おいしくて'],
+          correct: 2,
+        },
+        {
+          id: 31,
+          section: 'grammar',
+          question: 'A:「すみません、、スピーチコンテストはもう始まりましたか。」<br>B:「_____________。」<br>A:「何時に始まりますか」<br>B:「三時十分です。あと十分です」。',
+          options: ['はい、もう始まりました', 'いいえ、まだ始まりません', 'いいえ、まだ始まっていません', 'はい、始まります'],
+          correct: 1,
+        },
+        {
+          id: 32,
+          section: 'grammar',
+          question: 'A:「あのう、これ、おねがいします。」<br>B:「______________。1500えんに なります。」',
+          options: ['はい、わかりました', 'はい、かしこまりました', 'はい、全部ですね', 'はい、けっこうです'],
+          correct: 1,
+        },
+        {
+          id: 33,
+          section: 'grammar',
+          question: '「皆様にお願いいたします。公園内は禁煙になっております。小さいお子様も お見えですので、公園内でのおたばこは、ご遠慮くださいませ。 _______________。」',
+          options: ['ありがとうございました', '皆様はわかりましたか', 'これからもどうぞよろしくお願いします', 'ご協力よろしくお願いいたします'],
+          correct: 3,
+        },
+        {
+          id: 34,
+          section: 'listening',
+          question: '質問：会社のことを知りたいと、誰に聞きますか',
+          options: ['私に', '社長に', '渡辺さんに', '社員に'],
+          correct: 2,
+        },
+        {
+          id: 35,
+          section: 'listening',
+          question: '質問:お二人は何を飲みますか',
+          options: ['ソフトドリンク', 'お酒', 'ビール', 'ウーロン茶'],
+          correct: 3,
+        },
+        {
+          id: 36,
+          section: 'listening',
+          question: '質問：かとうさんはどのひとですか？',
+          options: ['コーヒーを飲む人', 'コーピーをしている人', 'カフェにいる人', '誰も知りません'],
+          correct: 1,
+        },
+        {
+          id: 37,
+          section: 'listening',
+          question: '質問：おすすめの料理は何ですか',
+          options: ['とちの料理', 'とりの天ぷら', '「へいべい」がすすめ', '店'],
+          correct: 1,
+        },
+        {
+          id: 38,
+          section: 'listening',
+          question: '質問：ラッシュの時、東京ははどうなりますか。',
+          options: ['電車は混んでいます', '人が多い', 'すごく大変', '遊ぶところがいろいろある'],
+          correct: 2,
+        },
+        {
+          id: 39,
+          section: 'listening',
+          question: '問題：トイレに入る時、はり紙に何が書いてありますか',
+          options: ['「紙 をごみ箱 にすててください」', '「トイレットペーパーはトイレに流ながしてください」', '「なが せるのは、いいです」', '「トイレットペーパーをつかってください」'],
+          correct: 1,
+        },
+        {
+          id: 40,
+          section: 'reading',
+          question:
+            '私の趣味は絵をかくことです。毎日、学校から帰ったあとで、一時間ぐらい絵をかきます。花や動物の絵が好きです。先月、絵のコンテストに出しました。一番にはなれませんでしたが、先生に「上手ですね」と言われて、とてもうれしかったです。将来、もっと上手になりたいです。<br> 質問:この人はどうしてうれしそうですか。',
+          options: ['一番になりませんから', '先生に「上手」だと言いますから', '絵をかくことですから', '絵のコンテストに出ますから'],
+          correct: 1,
+        },
+        {
+          id: 41,
+          section: 'reading',
+          question:
+            '私の趣味は絵をかくことです。毎日、学校から帰ったあとで、一時間ぐらい絵をかきます。花や動物の絵が好きです。先月、絵のコンテストに出しました。一番にはなれませんでしたが、先生に「上手ですね」と言われて、とてもうれしかったです。将来、もっと上手になりたいです。<br> 質問：どんな絵がすきですか。',
+          options: ['絵のコンテス', '趣味', '動物や花', '上手になりたい'],
+          correct: 2,
+        },
+        {
+          id: 42,
+          section: 'reading',
+          question:
+            '先週の土曜日、家族と京都へ旅行に行きました。朝早く起きて、新幹線に乗りました。京都に着いてから、有名なお寺を見に行きました。きんかくじはとてもきれいで、たくさん写真を撮りました。お昼には、おいしい抹茶のアイスクリームを食べました。また京都に行きたいです。<br> 質問：京都旅行の時、何を見に行きましたか。',
+          options: ['家族', '京都', 'きんかくじ', '新幹線'],
+          correct: 2,
+        },
+        {
+          id: 43,
+          section: 'reading',
+          question:
+            '先週の土曜日、家族と京都へ旅行に行きました。朝早く起きて、新幹線に乗りました。京都に着いてから、有名なお寺を見に行きました。きんかくじはとてもきれいで、たくさん写真を撮りました。お昼には、おいしい抹茶のアイスクリームを食べました。また京都に行きたいです。<br> 質問：有名なお寺を見て、それから何をしましたか。',
+          options: ['京都へ行きました', 'たくさん写真を撮りました', 'きんかくじはとてもきれいです', 'おいしい抹茶のアイスクリームを食べました。'],
+          correct: 1,
+        },
+        {
+          id: 44,
+          section: 'reading',
+          question:
+            '先月、デパートで買い物をしていたとき、知らない人の後ろを歩いていました。その人のコートがお母さんのコートと同じだったので、「お母さん！」と呼びました。でも、その人が振り向いたら、全然知らない人でした。「すみません、間違えました」と言って、顔が真っ赤になりました。お母さんは隣の店にいました。<br>質問：これはどんな話ですか。',
+          options: ['おもしろい話', 'はずかしい話', 'かなしい話', 'よい話'],
+          correct: 1,
+        },
+        {
+          id: 45,
+          section: 'reading',
+          question:
+            '先月、デパートで買い物をしていたとき、知らない人の後ろを歩いていました。その人のコートがお母さんのコートと同じだったので、「お母さん！」と呼びました。でも、その人が振り向いたら、全然知らない人でした。「すみません、間違えました」と言って、顔が真っ赤になりました。お母さんは隣の店にいました。<br>質問：どうして間違えましたか。',
+          options: ['お母さんは店にいますから', '知らない人ですから', 'コートがお母さんとおなじですから', 'いっしょに買い物しましたから'],
+          correct: 2,
+        },
+        {
+          id: 46,
+          section: 'reading',
+          question: '明日友達の誕生日パーティーがあります。パーティーに来るように言ってくれいましたが、なにを持ってきたらいいかわかりません。すると、プレゼントを かいに いったほうがいいと思いました。<br>質問：私は明日友達に何を しますか。',
+          options: ['プレゼントを あげようと思います', 'プレゼントを 送ろうと思います', 'パーティーに来るかどうかわかりません', 'プレゼントを うります'],
+          correct: 0,
+        },
+        {
+          id: 47,
+          section: 'reading',
+          question:
+            '「花火」という ホテルは きれいです。銀行と近くて部屋も 広いです。しかし、ちょっと 高くて駅から遠いと思います。そのあたりにも「季節」という安いホテルもありますが、建物が悪くてにぎやかです。仕方がないから、銀行の近くにあるホテルに泊まります。<br>質問：この人はどこのホテルに泊まりますか。',
+          options: ['銀行と近いホテルに泊まります', '「花火」という部屋に泊まります', '「花火」というホテルに泊まります', '「季節」というホテルに泊まります'],
+          correct: 2,
+        },
+        {
+          id: 48,
+          section: 'reading',
+          question:
+            '山田さんは夜おそくまで仕事をしています。朝早く起きて、シャワーを浴びて、朝ごはんを食べないで、会社に行っています。昼休み時間はそうじすることにします。ひまはなくてずっと働きそうです。<br>質問：山田さんはどんな人ですか。',
+          options: ['いそがしい人', 'ひまな人', '元気な人', '働く人'],
+          correct: 0,
+        },
+        {
+          id: 49,
+          section: 'reading',
+          question:
+            '私の夢は医者になることです。小さいとき、よく病気になりました。そのとき、お医者さんがとても優しくしてくれました。それで、私も大きくなったら、病気の人を助けたいと思いました。今は毎日たくさん勉強しています。大学に入るために、一生懸命がんばっています。<br> <b>質問：</b>どうして医者になりたいんですか',
+          options: ['とても優しいですから', '小さい時、病気でしたから', '病気の人を助けたいですから', '私の趣味ですから'],
+          correct: 2,
+        },
+        {
+          id: 50,
+          section: 'reading',
+          question:
+            '私の夢は医者になることです。小さいとき、よく病気になりました。そのとき、お医者さんがとても優しくしてくれました。それで、私も大きくなったら、病気の人を助けたいと思いました。今は毎日たくさん勉強しています。大学に入るために、一生懸命がんばっています。<br> <b>質問：</b>お医者さんはどんな人ですか',
+          options: ['病気の人を助けたい人', '優しい人', '大学に入る人', '一生懸命がんばっている人'],
+          correct: 1,
+        },
+      ];
+
+      let currentState = 'start';
+      let currentQuestionIndex = 0;
+      let userAnswers = new Array(quizData.length).fill(null);
+      let timerInterval;
+      let timeRemaining = 60 * 60;
+      let participantName = '';
+
+      const app = document.getElementById('app');
+
+      function init() {
+        renderStartScreen();
+      }
+
+      function renderStartScreen() {
+        app.innerHTML = `
+                <div class="w-full max-w-2xl glass-panel md:rounded-3xl p-6 md:p-12 text-center relative h-screen md:h-auto flex flex-col justify-center mobile-full">
+                    <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-400 to-teal-500"></div>
+                 
+                    <div class="mb-6 inline-flex items-center justify-center w-16 h-16 md:w-20 md:h-20 rounded-full bg-emerald-100 text-emerald-600 shadow-inner">
+                         <img src="assets/logobin.png" alt="Deskripsi gambar" width="100" height="100">
+                    </div>
+
+                    <h1 class="text-3xl md:text-4xl font-bold text-emerald-900 mb-2 tracking-tight">JFT Basic Mr.DJ</h1>
+                    <p class="text-emerald-600/80 mb-6 md:mb-8 font-medium text-sm md:text-base">Simulasi Ujian Kemampuan Bahasa Jepang</p>
+                    
+                    <div class="space-y-3 text-left bg-white/50 p-4 md:p-6 rounded-xl border border-emerald-100 mb-6 md:mb-8">
+                        <div class="flex items-start gap-3">
+                            <span class="bg-emerald-200 text-emerald-800 text-xs font-bold px-2 py-1 rounded mt-0.5">INFO</span>
+                            <p class="text-xs md:text-sm text-slate-600">Ujian ini terdiri dari <strong>50 Soal</strong> yang dibagi menjadi 4 bagian.</p>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="bg-emerald-200 text-emerald-800 text-xs font-bold px-2 py-1 rounded mt-0.5">TIME</span>
+                            <p class="text-xs md:text-sm text-slate-600">Waktu pengerjaan: <strong>60 Menit</strong>.</p>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="bg-emerald-200 text-emerald-800 text-xs font-bold px-2 py-1 rounded mt-0.5">MOBILE</span>
+                            <p class="text-xs md:text-sm text-slate-600">Dioptimalkan untuk smartphone & tablet.</p>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <input type="text" id="participantName" placeholder="Masukkan Nama" 
+                            class="w-full px-4 py-3 md:px-6 md:py-4 rounded-xl border border-emerald-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none text-base md:text-lg text-center bg-white/80 placeholder-emerald-300/70 text-emerald-900 touch-target">
+                        
+                        <button onclick="startQuiz()" 
+                            class="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold py-3 md:py-4 rounded-xl shadow-lg shadow-emerald-500/30 text-base md:text-lg tracking-wide touch-target no-select">
+                            Mulai Ujian
+                        </button>
+                    </div>
+                </div>
+            `;
+      }
+
+      function startQuiz() {
+        const nameInput = document.getElementById('participantName');
+        if (!nameInput.value.trim()) {
+          nameInput.classList.add('ring-2', 'ring-red-400', 'bg-red-50');
+          setTimeout(() => nameInput.classList.remove('ring-2', 'ring-red-400', 'bg-red-50'), 2000);
+          return;
+        }
+        participantName = nameInput.value.trim();
+
+        currentState = 'quiz';
+        startTimer();
+        renderQuiz();
+      }
+
+      function startTimer() {
+        timerInterval = setInterval(() => {
+          timeRemaining--;
+          const timerEl = document.getElementById('headerTimer');
+          if (timerEl) {
+            const m = Math.floor(timeRemaining / 60)
+              .toString()
+              .padStart(2, '0');
+            const s = (timeRemaining % 60).toString().padStart(2, '0');
+            timerEl.innerText = `${m}:${s}`;
+
+            if (timeRemaining < 300) {
+              timerEl.style.color = '#ef4444';
+              timerEl.style.fontWeight = 'bold';
+            }
+          }
+
+          if (timeRemaining <= 0) {
+            clearInterval(timerInterval);
+            finishQuiz(true);
+          }
+        }, 1000);
+      }
+
+      function renderQuiz() {
+        const q = quizData[currentQuestionIndex];
+        const totalQuestions = quizData.length;
+        const progress = ((currentQuestionIndex + 1) / totalQuestions) * 100;
+
+        let sectionTitle = '';
+        let sectionColor = '';
+        if (q.section === 'vocab') {
+          sectionTitle = 'Kosakata';
+          sectionColor = 'bg-blue-100 text-blue-800';
+        } else if (q.section === 'grammar') {
+          sectionTitle = 'Tata Bahasa';
+          sectionColor = 'bg-purple-100 text-purple-800';
+        } else if (q.section === 'listening') {
+          sectionTitle = 'Listening';
+          sectionColor = 'bg-orange-100 text-orange-800';
+        } else if (q.section === 'reading') {
+          sectionTitle = 'Reading';
+          sectionColor = 'bg-pink-100 text-pink-800';
+        }
+
+        // Navigation grid - responsive columns
+        let navGrid = '';
+        const cols = window.innerWidth < 768 ? 6 : 5;
+        for (let i = 0; i < totalQuestions; i++) {
+          const isCurrent = i === currentQuestionIndex;
+          const isAnswered = userAnswers[i] !== null;
+          let btnClass = 'nav-btn rounded-lg text-xs font-bold flex items-center justify-center no-select ';
+
+          if (isCurrent) btnClass += 'bg-emerald-600 text-white ring-2 ring-emerald-300';
+          else if (isAnswered) btnClass += 'bg-emerald-200 text-emerald-800';
+          else btnClass += 'bg-slate-100 text-slate-400';
+
+          navGrid += `<button onclick="jumpToQuestion(${i})" class="${btnClass}">${i + 1}</button>`;
+        }
+
+        app.innerHTML = `
+                <div class="w-full h-screen md:h-auto md:max-w-5xl flex flex-col md:flex-row gap-0 md:gap-6 mobile-full">
+                    
+                    <!-- Mobile: Top info bar -->
+                    <div class="md:hidden bg-white border-b border-emerald-100 p-3 flex justify-between items-center sticky top-0 z-40">
+                        <span class="${sectionColor} px-2 py-1 rounded text-xs font-bold">${sectionTitle}</span>
+                        <div class="font-mono text-lg font-bold text-emerald-800" id="headerTimer">${formatTime(timeRemaining)}</div>
+                    </div>
+
+                    <!-- Desktop Sidebar / Mobile Hidden by default -->
+                    <div class="hidden md:flex md:w-1/4 glass-panel rounded-2xl p-6 flex-col h-[85vh]">
+                        <div class="mb-6">
+                            <h2 class="text-xl font-bold text-emerald-900 mb-1">Navigasi</h2>
+                            <div class="flex items-center gap-2 text-sm text-emerald-600">
+                                <span class="w-3 h-3 rounded-full bg-emerald-600"></span> Saat ini
+                                <span class="w-3 h-3 rounded-full bg-emerald-200 ml-2"></span> Terjawab
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-5 gap-2 overflow-y-auto pr-2 flex-grow content-start">
+                            ${navGrid}
+                        </div>
+
+                        <div class="mt-6 pt-6 border-t border-emerald-100">
+                             <button onclick="finishQuiz()" class="w-full py-3 rounded-xl border-2 border-red-200 text-red-500 font-bold hover:bg-red-50 touch-target">
+                                Akhiri Ujian
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Main Content -->
+                    <div class="w-full md:w-3/4 flex flex-col h-full content-padded">
+                        
+                        <!-- Desktop Header -->
+                        <div class="hidden md:flex glass-panel rounded-2xl p-4 justify-between items-center shadow-sm mb-4">
+                            <span class="${sectionColor} px-3 py-1 rounded-full text-xs font-bold uppercase">${sectionTitle}</span>
+                            <div class="flex items-center gap-2 text-emerald-800 font-mono text-xl font-bold">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span id="headerTimer">${formatTime(timeRemaining)}</span>
+                            </div>
+                        </div>
+
+                        <!-- Question Card -->
+                        <div class="flex-grow flex flex-col p-4 md:p-8 bg-white md:rounded-2xl md:glass-panel overflow-y-auto">
+                            <div class="mb-2">
+                                <span class="text-emerald-500 font-bold text-xs tracking-widest uppercase">Soal ${currentQuestionIndex + 1}/${totalQuestions}</span>
+                                <div class="w-full h-1 bg-slate-100 rounded-full mt-2">
+                                    <div class="h-full bg-emerald-500 rounded-full" style="width: ${progress}%"></div>
+                                </div>
+                            </div>
+
+                            <h3 class="text-lg md:text-2xl font-bold text-slate-800 mb-6 leading-relaxed font-serif">${q.question}</h3>
+
+                            <div class="flex flex-col gap-3 mb-20 md:mb-0">
+                                ${q.options
+                                  .map(
+                                    (opt, idx) => `
+                                    <button onclick="selectOption(${idx})" 
+                                        class="option-btn w-full text-left p-4 rounded-xl border-2 ${userAnswers[currentQuestionIndex] === idx ? 'border-emerald-500 bg-emerald-50' : 'border-slate-100 bg-white'} flex items-center gap-3 no-select touch-target">
+                                        <div class="w-8 h-8 rounded-full ${userAnswers[currentQuestionIndex] === idx ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'} flex items-center justify-center font-bold text-sm flex-shrink-0">
+                                            ${String.fromCharCode(65 + idx)}
+                                        </div>
+                                        <span class="text-sm md:text-base text-slate-700 font-medium leading-snug">${opt}</span>
+                                    </button>
+                                `,
+                                  )
+                                  .join('')}
+                            </div>
+                        </div>
+
+                        <!-- Desktop Footer -->
+                        <div class="hidden md:flex glass-panel rounded-2xl p-4 justify-between items-center mt-4">
+                            <button onclick="prevQuestion()" ${currentQuestionIndex === 0 ? 'disabled' : ''} 
+                                class="px-6 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 disabled:opacity-30 touch-target flex items-center gap-2">
+                                <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                                Sebelumnya
+                            </button>
+                            
+                            <span class="text-slate-400 font-medium text-sm">${currentQuestionIndex + 1} / ${totalQuestions}</span>
+
+                            <button onclick="nextQuestion()" 
+                                class="px-8 py-3 rounded-xl font-bold bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg touch-target flex items-center gap-2">
+                                ${currentQuestionIndex === totalQuestions - 1 ? 'Selesai' : 'Selanjutnya'}
+                                <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mobile Bottom Navigation -->
+                <div class="md:hidden mobile-nav flex justify-between items-center gap-4">
+                    <button onclick="prevQuestion()" ${currentQuestionIndex === 0 ? 'disabled' : ''} 
+                        class="flex-1 py-3 px-4 rounded-xl font-bold text-slate-600 bg-slate-100 disabled:opacity-30 touch-target no-select flex items-center justify-center gap-2">
+                        <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                        Prev
+                    </button>
+                    
+                    <button onclick="showMobileNav()" class="px-4 py-3 rounded-xl bg-emerald-100 text-emerald-700 font-bold touch-target no-select">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                    </button>
+
+                    <button onclick="nextQuestion()" 
+                        class="flex-1 py-3 px-4 rounded-xl font-bold bg-emerald-600 text-white shadow-lg touch-target no-select flex items-center justify-center gap-2">
+                        ${currentQuestionIndex === totalQuestions - 1 ? 'Selesai' : 'Next'}
+                        <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+                    </button>
+                </div>
+
+                <!-- Mobile Navigation Modal -->
+                <div id="mobileNavModal" class="fixed inset-0 bg-black/50 z-50 hidden" onclick="hideMobileNav(event)">
+                    <div class="absolute bottom-20 left-4 right-4 bg-white rounded-2xl p-4 max-h-96 overflow-y-auto" onclick="event.stopPropagation()">
+                        <div class="flex justify-between items-center mb-4 pb-2 border-b">
+                            <h3 class="font-bold text-slate-800">Navigasi Soal</h3>
+                            <button onclick="hideMobileNav()" class="text-slate-400 p-2">
+                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-6 gap-2 nav-grid-compact">
+                            ${navGrid}
+                        </div>
+                        <button onclick="finishQuiz()" class="w-full mt-4 py-3 rounded-xl border-2 border-red-200 text-red-500 font-bold">
+                            Akhiri Ujian
+                        </button>
+                    </div>
+                </div>
+            `;
+      }
+
+      function showMobileNav() {
+        document.getElementById('mobileNavModal').classList.remove('hidden');
+      }
+
+      function hideMobileNav(e) {
+        if (!e || e.target.id === 'mobileNavModal') {
+          document.getElementById('mobileNavModal').classList.add('hidden');
+        }
+      }
+
+      function formatTime(seconds) {
+        const m = Math.floor(seconds / 60)
+          .toString()
+          .padStart(2, '0');
+        const s = (seconds % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+      }
+
+      function selectOption(index) {
+        userAnswers[currentQuestionIndex] = index;
+        renderQuiz();
+        // Auto next on mobile after selection (optional)
+        // setTimeout(() => nextQuestion(), 300);
+      }
+
+      function nextQuestion() {
+        if (currentQuestionIndex < quizData.length - 1) {
+          currentQuestionIndex++;
+          renderQuiz();
+          window.scrollTo(0, 0);
+        } else {
+          finishQuiz();
+        }
+      }
+
+      function prevQuestion() {
+        if (currentQuestionIndex > 0) {
+          currentQuestionIndex--;
+          renderQuiz();
+          window.scrollTo(0, 0);
+        }
+      }
+
+      function jumpToQuestion(index) {
+        currentQuestionIndex = index;
+        hideMobileNav();
+        renderQuiz();
+        window.scrollTo(0, 0);
+      }
+
+      function finishQuiz(auto = false) {
+        clearInterval(timerInterval);
+
+        let correctCount = 0;
+        userAnswers.forEach((ans, idx) => {
+          if (ans === quizData[idx].correct) correctCount++;
+        });
+
+        const score = Math.round((correctCount / quizData.length) * 100);
+        const isPass = score >= 70;
+
+        renderResult(score, correctCount, isPass);
+        submitToGoogleSheets(score);
+      }
+
+      function renderResult(score, correctCount, isPass) {
+        const statusColor = isPass ? 'text-emerald-600' : 'text-red-500';
+        const statusBg = isPass ? 'bg-emerald-100' : 'bg-red-100';
+        const statusText = isPass ? 'LULUS' : 'TIDAK LULUS';
+        const statusIcon = isPass
+          ? '<svg class="w-20 h-20 md:w-24 md:h-24 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>'
+          : '<svg class="w-20 h-20 md:w-24 md:h-24 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+
+        const sections = ['vocab', 'grammar', 'listening', 'reading'];
+        const sectionNames = { vocab: 'Kosakata', grammar: 'Tata Bahasa', listening: 'Mendengar', reading: 'Membaca' };
+        let breakdownHtml = '';
+
+        sections.forEach((sec) => {
+          const secQuestions = quizData.filter((q) => q.section === sec);
+          const secCorrect = secQuestions.filter((q) => userAnswers[q.id - 1] === q.correct).length;
+          const secPercent = Math.round((secCorrect / secQuestions.length) * 100);
+
+          breakdownHtml += `
+                    <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-100">
+                        <span class="font-medium text-slate-600 text-sm">${sectionNames[sec]}</span>
+                        <div class="flex items-center gap-2">
+                            <div class="w-20 md:w-32 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                <div class="h-full ${secPercent >= 60 ? 'bg-emerald-500' : 'bg-red-400'}" style="width: ${secPercent}%"></div>
+                            </div>
+                            <span class="text-sm font-bold w-10 text-right">${secCorrect}/${secQuestions.length}</span>
+                        </div>
+                    </div>
+                `;
+        });
+
+        app.innerHTML = `
+                <div class="w-full max-w-2xl glass-panel md:rounded-3xl p-6 md:p-12 text-center relative mobile-full h-screen md:h-auto overflow-y-auto">
+                    <div class="absolute top-0 left-0 w-full h-2 ${isPass ? 'bg-emerald-500' : 'bg-red-500'}"></div>
+                    
+                    <div class="flex justify-center mb-4 md:mb-6">
+                        ${statusIcon}
+                    </div>
+
+                    <h2 class="text-2xl md:text-3xl font-bold text-slate-800 mb-2">Hasil Ujian</h2>
+                    <p class="text-slate-500 mb-6 md:mb-8 text-sm md:text-base">Terima kasih, <span class="font-bold text-emerald-700">${participantName}</span></p>
+
+                    <div class="flex justify-center items-center mb-6 md:mb-10">
+                        <div class="relative w-32 h-32 md:w-40 md:h-40 flex items-center justify-center rounded-full border-8 ${isPass ? 'border-emerald-100' : 'border-red-100'}">
+                            <div class="text-center">
+                                <span class="block text-3xl md:text-4xl font-bold ${statusColor}">${score}%</span>
+                                <span class="text-xs text-slate-400 uppercase tracking-wide">Skor</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="inline-block px-4 py-2 md:px-6 md:py-2 rounded-full ${statusBg} ${statusColor} font-bold text-base md:text-lg mb-6 md:mb-8 tracking-widest">
+                        ${statusText}
+                    </div>
+
+                    <div class="text-left bg-slate-50 p-4 md:p-6 rounded-2xl mb-6 md:mb-8 border border-slate-100">
+                        <h3 class="font-bold text-slate-700 mb-3 md:mb-4 flex items-center gap-2 text-sm md:text-base">
+                            <svg class="w-4 h-4 md:w-5 md:h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                            Analisis Bagian
+                        </h3>
+                        <div class="space-y-2">
+                            ${breakdownHtml}
+                        </div>
+                    </div>
+
+                    <div class="p-3 md:p-4 bg-blue-50 text-blue-700 rounded-xl text-xs md:text-sm mb-6 md:mb-8 border border-blue-100">
+                        <p>Data hasil tes telah dikirim ke Google Sheets.</p>
+                    </div>
+
+                    <button onclick="location.reload()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 md:py-4 rounded-xl touch-target no-select">
+                        Kembali ke Awal
+                    </button>
+                </div>
+            `;
+      }
+
+      function submitToGoogleSheets(score) {
+        const scriptURL = 'https://script.google.com/macros/s/AKfycbzglzg-VI9ATpX2EsbgK8BRJfSbI_G9ncYdBWVp0fq5G6xot2_tnkONevvGmW5Z30s/exec';
+
+        const minutes = Math.floor(timeRemaining / 60);
+        const seconds = timeRemaining % 60;
+        const timeLeftStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+        const data = {
+          name: participantName,
+          score: score,
+          timeLeft: timeLeftStr,
+          details: JSON.stringify(userAnswers),
+          timestamp: new Date().toISOString(),
+        };
+
+        fetch(scriptURL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        }).catch((error) => console.error('Error:', error));
+      }
+
+      // Handle resize untuk responsive nav grid
+      window.addEventListener('resize', () => {
+        if (currentState === 'quiz') renderQuiz();
+      });
+
+      init();
+    </script>
+  </body>
+</html>
